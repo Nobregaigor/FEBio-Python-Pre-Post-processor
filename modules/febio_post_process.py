@@ -30,6 +30,7 @@ class FEBio_post_process():
         self.xyz_positions.extend(read_feb_out_txt_file(positions_file_path))
 
     def set_initial_positions(self,doc=None):
+        """ Hello """
         _doc = self.doc if doc == None else doc
 
         nodes = {}

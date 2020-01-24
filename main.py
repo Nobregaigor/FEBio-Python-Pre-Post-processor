@@ -40,4 +40,6 @@ if __name__ == "__main__":
     
     # Calculating Ejection Fraction
     ejection_fraction = myo_post_process.ejection_fraction()
+    print(ejection_fraction)
+    print("hello")
     
