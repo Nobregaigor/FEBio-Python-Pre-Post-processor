@@ -21,13 +21,23 @@ if __name__ == "__main__":
     myo_post_process.add_node_set("Epicardio")
     myo_post_process.add_node_set("Endocardio")
     myo_post_process.add_node_set("Top_surface")
+    # Set inital positions obtained by .feb model
+    myo_post_process.set_initial_positions()
     # Set positions obtained by the simulations
-
-    pos = myo_post_process.set_initial_positions()
     myo_post_process.set_sim_positions(position_nodes_out_file_path)
+    
+    myo_post_process.get_apex_and_base_nodes()
+    print("Apex:")
+    pp(myo_post_process.apex_nodes)
+    print("Base:")
+    pp(myo_post_process.base_nodes)
+    
 
-    # pp(myo_post_process.xyz_positions[0]["nodes"]["1"])
 
-
-    vol = myo_post_process.cal_vol(1)
-    pp(vol)
+    # ___________________
+    # Calculations
+    # ___________________
+    
+    # Calculating Ejection Fraction
+    ejection_fraction = myo_post_process.ejection_fraction()
+    

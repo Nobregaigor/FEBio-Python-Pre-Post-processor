@@ -1,0 +1,16 @@
+# Ejection Fraction (EF):
+    ## Pre-processing data: 100 %
+    ## Calculating convex hull (internal volume): 100%
+    ## Calculating final value: 100%
+    ## Checking results: 75%
+
+# Myocardium Torsion (AMT):
+
+
+# Wall Thickening (delta_h / h):
+
+
+# Longitudinal shortening (delta_l / l):
+
+
+# Radial shortening (delta_r / r):
