@@ -1,38 +1,38 @@
-
-
+import numpy as np
 
 def read_feb_out_txt_file(file_path):
     with open(file_path, mode="r") as txt_file:
         output = []
-        
+
         has_structure = False
-        
+
         header_boolean_0 = False
         header_boolean_1 = False
-        
+
         idx = int(-1)
-        
+
         # try:
         for line in txt_file:
-                            
+
             line = line.rstrip().lstrip().strip(' ')
             if line[0] == "*":
                 header_boolean_1 = True
-                
+
                 if header_boolean_1 != header_boolean_0:
                     # print("TRUE AT LINE:")
                     # print(line)
-                    
+
                     data = {
                         "step": 0,
                         "time": 0,
                         "struct": [],
                         "nodes": {},
-                        "val": None
+                        "val": None,
+                        "points": [],
                     }
                     output.append(data)
-                    idx += 1                
-                
+                    idx += 1
+
                 info = line.split("= ")
                 if info[0].lower().find("step") > -1:
                     output[idx]["step"] = int(info[1])
@@ -43,22 +43,29 @@ def read_feb_out_txt_file(file_path):
                     output[idx]["struct"] = info[1].split(";")
             else:
                 header_boolean_1 = False
-                
+
                 data_line = line.split(",")
                 if has_structure:
                     val = {"node": data_line[0]}
                     # print(data_line)
-                    for i in range(0,len(data_line[1:])):
+                    n_keys = len(data_line[1:])
+                    sub_array = np.zeros(n_keys)
+                    for i in range(0,n_keys):
                         key = data["struct"][i]
-                        val[key] = data_line[i+1]
+                        try:
+                            val[key] = float(data_line[i+1])
+                            sub_array[i] = float(data_line[i+1])
+                        except:
+                            val[key] = data_line[i+1]
+                    output[idx]["points"].append(sub_array)
                     output[idx]["nodes"][str(data_line[0])] = val
                     # print(val)
                 else:
                     output[idx]["val"] = data_line
-                    
+
             header_boolean_0 = header_boolean_1
         return output
-    
+
 def read_csv(self,file_path):
     with open(file_path, mode='r') as csv_file:
         try:
@@ -68,8 +75,8 @@ def read_csv(self,file_path):
                 data.append(row)
             return data
         except:
-            raise(ValueError('Error reading csv file.\n'))  
-        
+            raise(ValueError('Error reading csv file.\n'))
+
 def get_nodes_from_nodeset(doc,node_set_name):
         """
             Extract nodes from nodeset in a .feb file by extracting the Nodesets and comparing the name atrr.
@@ -82,7 +89,7 @@ def get_nodes_from_nodeset(doc,node_set_name):
             name = node_set.attributes['name'].value
             # If the name matches, extract all the nodes and return
             if name == node_set_name:
-                # Extracting elements with 
+                # Extracting elements with
                 node_elems = node_set.getElementsByTagName("node")
                 nodes = []
                 for node in node_elems:
@@ -90,10 +97,10 @@ def get_nodes_from_nodeset(doc,node_set_name):
 
                 nodes = sorted(nodes)
 
-                return nodes          
-            
+                return nodes
+
 def load_by_tag(doc_file,tag):
-    """ 
+    """
         Function used to load desired elements from xml file using their tag attribute
         Reuires:
             doc_file: Path to file document (string)
