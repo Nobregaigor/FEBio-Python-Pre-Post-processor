@@ -25,7 +25,12 @@ if __name__ == "__main__":
     # Set positions obtained by the simulations
     myo_post_process.set_sim_positions(position_nodes_out_file_path)
     # Get Apex and base node. Base node will be a REF node, since it is not contained in mesh
-    myo_post_process.get_apex_and_base_nodes(set_as_properties=True)  
+    myo_post_process.get_apex_and_base_nodes(set_as_properties=True)
+    
+    apex = myo_post_process.apex_node
+    nodes_within_range = myo_post_process.get_nodes_within_range(apex['node'])
+    print(nodes_within_range)
+    
 
     # ___________________
     # Calculations

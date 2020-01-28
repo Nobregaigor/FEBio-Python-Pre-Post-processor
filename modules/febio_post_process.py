@@ -73,24 +73,29 @@ class FEBio_post_process():
         else:
             raise(ValueError("get_nodes_data_from_nodeset: node_set_name not defined in self.node_sets"))
 
+    def get_xyz_distance(self,node_1,node_2):
+        delta_x = node_1['x'] - node_2['x']
+        delta_y = node_1['y'] - node_2['y']
+        delta_z = node_1['z'] - node_2['z']
+        
+        return np.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
+    
     def get_apex_and_base_nodes(self,node_set=None,set_as_properties=False):
         if node_set == None:
             nodes = self.xyz_positions[0]["nodes"]
         else:
-            nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
+            if type(node_set) == str:
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
+            elif type(node_set) == dict:
+                nodes = node_set
+            else:
+                raise(ValueError("get_closest_node: node_set type not understood"))
 
         def get_min_max(direction, prev_min, prev_max, new):
             min_val = new if new[direction] < prev_min[direction] else prev_min
             max_val = new if new[direction] > prev_max[direction] else prev_max
 
             return min_val, max_val
-            
-        def get_xyz_distance(node_1,node_2):
-            delta_x = node_1['x'] - node_2['x']
-            delta_y = node_1['y'] - node_2['y']
-            delta_z = node_1['z'] - node_2['z']
-            
-            return np.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
             
 
         # Get min and max nodes from all coordinates
@@ -122,7 +127,7 @@ class FEBio_post_process():
             for j in range(0,6):
                 if j != i:
                     node_2 = extreme_nodes[j]
-                    distance_sum += get_xyz_distance(node_1,node_2)
+                    distance_sum += self.get_xyz_distance(node_1,node_2)
             
             # Calculate the mean distances
             new_mean_dist = distance_sum * 0.2
@@ -175,13 +180,82 @@ class FEBio_post_process():
                 "base_node": base_node,
                 "extreme_nodes": extreme_nodes
                 }
-
-    def is_within_range(direction,param,node, error):
-                if param[direction] - error < node[direction] < param[direction] + error:
-                    return True
-                else:
-                    return False
+    
+    def get_closest_node(self,node_ref_id,node_set=None):
+        if node_set == None:
+            nodes = self.xyz_positions[0]["nodes"]
+        else:
+            if type(node_set) == str:
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
+            elif type(node_set) == dict:
+                nodes = node_set
+            else:
+                raise(ValueError("get_closest_node: node_set type not understood"))
+        
+        node_ref_id = str(node_ref_id)
+        if node_ref_id in nodes:
+            node_ref = nodes[node_ref_id]
+            node = nodes[next(iter(nodes))]
+            dist = self.get_xyz_distance(node_ref,node)
+            close_node = node
+            for node_id in nodes:
+                if node_id != node_ref_id:
+                    node = nodes[node_id]
+                    new_dist = self.get_xyz_distance(node_ref,node)
+                    if new_dist < dist:
+                        dist = new_dist
+                        close_node = node
+            return close_node, dist
+        else:
+            raise(ValueError("get_closest_node: node_ref_id not in nodes"))
+    
+    def get_nodes_within_range(self,node_ref_id,dist=None,al_err=0.1,node_set=None):
+        if node_set == None:
+            nodes = self.xyz_positions[0]["nodes"]
+        else:
+            if type(node_set) == str:
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
+            elif type(node_set) == dict:
+                nodes = node_set
+            else:
+                raise(ValueError("get_closest_node: node_set type not understood"))
             
+        node_ref_id = str(node_ref_id)
+        
+        if dist == None: #Default: closest distance
+            closest_node, dist = self.get_closest_node(node_ref_id,node_set=nodes)
+        
+        min_dist = dist * (1 - al_err)
+        max_dist = dist * (1 + al_err)
+        
+        nodes_within_range = {}
+        node_ref = nodes[node_ref_id]
+        
+        max_tries = 10
+        trial_idx = 0
+        
+        while len(nodes_within_range) < 5:
+            if trial_idx > max_tries:
+                print("Max number of trials reached, please, increase allowed error.")
+                raise
+            
+            for node_id in nodes:
+                if node_id != node_ref_id:
+                    node = nodes[node_id]
+                    new_dist = self.get_xyz_distance(node_ref,node)
+                    if min_dist < new_dist < max_dist:
+                        nodes_within_range[node_id] = node
+            
+            al_err += 0.025
+            
+            min_dist = dist * (1 - al_err)
+            max_dist = dist * (1 + al_err)
+            
+            trial_idx += 1
+            
+        return nodes_within_range       
+    
+
     ##################################################
     # Calculation Methods
     ##################################################
