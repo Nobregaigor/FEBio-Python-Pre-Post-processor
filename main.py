@@ -28,7 +28,7 @@ if __name__ == "__main__":
     myo_post_process.get_apex_and_base_nodes(set_as_properties=True)
     
     apex = myo_post_process.apex_node
-    nodes_within_range = myo_post_process.get_nodes_within_range(apex['node'])
+    nodes_within_range = myo_post_process.get_nodes_within_range(apex['node'],node_set="Epicardio")
     print(nodes_within_range)
     
 

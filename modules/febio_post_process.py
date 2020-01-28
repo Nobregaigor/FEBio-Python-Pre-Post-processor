@@ -195,7 +195,11 @@ class FEBio_post_process():
         node_ref_id = str(node_ref_id)
         if node_ref_id in nodes:
             node_ref = nodes[node_ref_id]
-            node = nodes[next(iter(nodes))]
+            inter_nodes = iter(nodes)
+            next_node_id = next(inter_nodes)
+            if next_node_id == node_ref_id:
+                next_node_id = next(inter_nodes)
+            node = nodes[next_node_id]
             dist = self.get_xyz_distance(node_ref,node)
             close_node = node
             for node_id in nodes:
@@ -231,13 +235,13 @@ class FEBio_post_process():
         nodes_within_range = {}
         node_ref = nodes[node_ref_id]
         
-        max_tries = 10
+        max_tries = 25
         trial_idx = 0
         
         while len(nodes_within_range) < 5:
             if trial_idx > max_tries:
-                print("Max number of trials reached, please, increase allowed error.")
-                raise
+                print("Warning: Max number of trials reached when trying to find nodes within range.\n")
+                return nodes_within_range
             
             for node_id in nodes:
                 if node_id != node_ref_id:
@@ -246,7 +250,7 @@ class FEBio_post_process():
                     if min_dist < new_dist < max_dist:
                         nodes_within_range[node_id] = node
             
-            al_err += 0.025
+            al_err += 0.05
             
             min_dist = dist * (1 - al_err)
             max_dist = dist * (1 + al_err)
@@ -254,7 +258,6 @@ class FEBio_post_process():
             trial_idx += 1
             
         return nodes_within_range       
-    
 
     ##################################################
     # Calculation Methods
