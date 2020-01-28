@@ -11,10 +11,9 @@ if __name__ == "__main__":
     # ___________________
     # Creating Object for Post Process
     # ___________________
-
+    print("Initializing Post Process...")
     # Storing the Post process at location defined by myo_post_process
     myo_post_process = FEBio_post_process()
-
     # Creating a doc for the desired post process file
     myo_post_process.create_doc(myo_feb_file_path)
     # Adding NodeSets to the object
@@ -25,21 +24,15 @@ if __name__ == "__main__":
     myo_post_process.set_initial_positions()
     # Set positions obtained by the simulations
     myo_post_process.set_sim_positions(position_nodes_out_file_path)
-    
-    myo_post_process.get_apex_and_base_nodes()
-    print("Apex:")
-    pp(myo_post_process.apex_nodes)
-    print("Base:")
-    pp(myo_post_process.base_nodes)
-    
-
+    # Get Apex and base node. Base node will be a REF node, since it is not contained in mesh
+    myo_post_process.get_apex_and_base_nodes(set_as_properties=True)  
 
     # ___________________
     # Calculations
     # ___________________
-    
+    print("Performing Calculations...")
     # Calculating Ejection Fraction
     ejection_fraction = myo_post_process.ejection_fraction()
-    print(ejection_fraction)
-    print("hello")
+    # print(ejection_fraction)
+    # print("hello")
     

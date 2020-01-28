@@ -12,8 +12,8 @@ class FEBio_post_process():
 
         self.xyz_positions = []
 
-        self.apex_nodes = {}
-        self.base_nodes = {}
+        self.apex_node = {}
+        self.base_node = {}
 
     ##################################################
     # Fundamental Methods
@@ -58,26 +58,46 @@ class FEBio_post_process():
     ##################################################
     # Aditional Parameters Methods
     ##################################################
+    
+    def get_nodes_data_from_nodeset(self,node_set_name,dataType,time=0):
+        if node_set_name in self.node_sets:
+            dataType = dataType.lower()
+            output = {}
+            if dataType == "xyz" or "position" or "positions":
+                data = self.xyz_positions[time]['nodes']
+                for node_id in self.node_sets[node_set_name]:
+                    output[str(node_id)] = data[str(node_id)]
+                return output
+            else:
+                raise(ValueError("get_nodes_data_from_nodeset: dataType not understood or was not implemented"))
+        else:
+            raise(ValueError("get_nodes_data_from_nodeset: node_set_name not defined in self.node_sets"))
 
-    def get_apex_and_base_nodes(self):
-        nodes = self.xyz_positions[0]["nodes"]
+    def get_apex_and_base_nodes(self,node_set=None,set_as_properties=False):
+        if node_set == None:
+            nodes = self.xyz_positions[0]["nodes"]
+        else:
+            nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
 
         def get_min_max(direction, prev_min, prev_max, new):
             min_val = new if new[direction] < prev_min[direction] else prev_min
             max_val = new if new[direction] > prev_max[direction] else prev_max
 
             return min_val, max_val
-
-        def is_within_range(direction,param,node, error):
-            if param[direction] - error < node[direction] < param[direction] + error:
-                return True
-            else:
-                return False
+            
+        def get_xyz_distance(node_1,node_2):
+            delta_x = node_1['x'] - node_2['x']
+            delta_y = node_1['y'] - node_2['y']
+            delta_z = node_1['z'] - node_2['z']
+            
+            return np.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
+            
 
         # Get min and max nodes from all coordinates
-        min_x, max_x = get_min_max('x', nodes["1"], nodes["1"], nodes["1"])
-        min_y, max_y = get_min_max('y', nodes["1"], nodes["1"], nodes["1"])
-        min_z, max_z = get_min_max('z', nodes["1"], nodes["1"], nodes["1"])
+        first_key = next(iter(nodes))
+        min_x, max_x = get_min_max('x', nodes[first_key], nodes[first_key], nodes[first_key])
+        min_y, max_y = get_min_max('y', nodes[first_key], nodes[first_key], nodes[first_key])
+        min_z, max_z = get_min_max('z', nodes[first_key], nodes[first_key], nodes[first_key])
 
         for node_id in nodes:
             node = nodes[node_id]
@@ -85,60 +105,83 @@ class FEBio_post_process():
             min_y, max_y = get_min_max('y', min_y, max_y, node)
             min_z, max_z = get_min_max('z', min_z, max_z, node)
 
+        # Create an array of min and max nodes (extremes of the mesh)
+        extreme_nodes = [min_x, min_y, min_z, max_x, max_y, max_z]
+        
+        # Set an initial value to keep track of mean distance (between each node)
+        mean_dist = 0
+        
+        # Loop through all nodes and calculate the distance with respect to the other nodes
+        for i in range(0,6):
+            
+            # Set an initial value to sum and calculate the mean of the distances
+            distance_sum = 0
+            # Point to node to be analized       
+            node_1 = extreme_nodes[i]
+            # sum the straight line from node_1 to all other nodes (defined as node_2)
+            for j in range(0,6):
+                if j != i:
+                    node_2 = extreme_nodes[j]
+                    distance_sum += get_xyz_distance(node_1,node_2)
+            
+            # Calculate the mean distances
+            new_mean_dist = distance_sum * 0.2
+            
+            # Check if the new mean is larger to the previous mean
+            if new_mean_dist >= mean_dist:
+                # Set the new mean as the curr mean
+                mean_dist = new_mean_dist
+                # Point to appex node and set the node idx (that will be removed from extremes later)
+                apex_node = node_1
+                apex_node_idx = i 
+        
+        # Get the idx of the opposite node of apex (won't be used to calculate the centroid)
+        node_opposite_to_apex = apex_node_idx + 2 if apex_node_idx < 3 else apex_node_idx - 3
 
-        min_nodes = [min_x, min_y, min_z]
-        max_nodes = [max_x, max_y, max_z]
-
+        # Delete the apex node and opposite node from the extreme nodes (already found the apex)
+        del extreme_nodes[apex_node_idx]
+        del extreme_nodes[node_opposite_to_apex]
+        
+        # Find centroid between remaining nodes (where base node will be located)
+        sum_x = 0
+        sum_y = 0
+        sum_z = 0
+        for node in extreme_nodes:
+            sum_x += node['x']
+            sum_y += node['y']
+            sum_z += node['z']
+        
+        # Create an object to be set as the base_node
+        base_node = {
+            'node': "REF",
+            'x': sum_x * 0.25,
+            'y': sum_y * 0.25,
+            'z': sum_z * 0.25,
+        }
+        
+        # Point to mins and maxs (for later reference, if needed)
         mins = {'x': min_x, 'y': min_y, 'z': min_z}
         maxs = {'x': max_x, 'y': max_y, 'z': max_z}
+        extreme_nodes = {'min': mins, 'max': maxs}
+        
+        # Set class properties to define apex and base nodes if set_as_properties is enabled
+        if set_as_properties:
+            self.apex_node = apex_node
+            self.base_node = base_node
+            self.extreme_nodes = extreme_nodes
+        else:
+            return {
+                "apex_node": apex_node,
+                "base_node": base_node,
+                "extreme_nodes": extreme_nodes
+                }
 
-        delta_nodes = [mins['x'], maxs['x']]
-        delta_max = 0
-        delta_vals = [0,0,0]
-
-        apex_node = [mins['x'], 'x']
-
-        for key_min in mins:
-            for key_max in maxs:
-                delta = abs(mins[key_min][key_min] - maxs[key_max][key_max])
-
-                new_max = True if delta > delta_max else False
-
-                if new_max:
-                    delta_max = delta
-                    apex_node[0] = mins[key_min]
-                    apex_node[1] = key_min
-                    # delta_nodes[1] = maxs[key_max]
-
-        # delta_x = abs(delta_nodes[0]['x'] - delta_nodes[1]['x'])
-        # delta_y = abs(delta_nodes[0]['y'] - delta_nodes[1]['y'])
-        # delta_z = abs(delta_nodes[0]['z'] - delta_nodes[1]['z'])
-        #
-        # delta_max_1 = np.max([delta_x, delta_y, delta_z])
-
-
-        print("Apex " + str(apex_node))
-
-
-
-
-
-
-
-
-
-
-        self.apex_nodes = mins
-        self.base_nodes = maxs
-
-        # for node_id in nodes:
-        #     node = nodes[node_id]
-        #     count_min_x = count_x + 1 if is_within_range('x', min_x,node,5)
-        #     count_min_y = count_x + 1 if is_within_range('y', min_y,node,5)
-        #     count_min_z = count_x + 1 if is_within_range('z', min_z,node,5)
-
-
-
+    def is_within_range(direction,param,node, error):
+                if param[direction] - error < node[direction] < param[direction] + error:
+                    return True
+                else:
+                    return False
+            
     ##################################################
     # Calculation Methods
     ##################################################
