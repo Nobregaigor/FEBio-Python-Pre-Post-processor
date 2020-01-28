@@ -11,10 +11,10 @@ class FEBio_post_process():
         self.node_sets = {}
 
         self.xyz_positions = []
-        
+
         self.apex_nodes = {}
         self.base_nodes = {}
-        
+
     ##################################################
     # Fundamental Methods
     ##################################################
@@ -43,7 +43,7 @@ class FEBio_post_process():
             sub_array[1] = elem[1]
             sub_array[2] = elem[2]
             points.append(sub_array)
-            
+
         output = {
                 "step": 0,
                 "time": 0,
@@ -52,52 +52,93 @@ class FEBio_post_process():
                 "val": None,
                 "points": points,
             }
-        
+
         self.xyz_positions.append(output)
-        
+
     ##################################################
     # Aditional Parameters Methods
     ##################################################
-    
+
     def get_apex_and_base_nodes(self):
         nodes = self.xyz_positions[0]["nodes"]
-        
+
         def get_min_max(direction, prev_min, prev_max, new):
             min_val = new if new[direction] < prev_min[direction] else prev_min
             max_val = new if new[direction] > prev_max[direction] else prev_max
-            
+
             return min_val, max_val
-        
+
         def is_within_range(direction,param,node, error):
             if param[direction] - error < node[direction] < param[direction] + error:
                 return True
             else:
                 return False
-            
+
+        # Get min and max nodes from all coordinates
         min_x, max_x = get_min_max('x', nodes["1"], nodes["1"], nodes["1"])
         min_y, max_y = get_min_max('y', nodes["1"], nodes["1"], nodes["1"])
         min_z, max_z = get_min_max('z', nodes["1"], nodes["1"], nodes["1"])
-                        
+
         for node_id in nodes:
             node = nodes[node_id]
             min_x, max_x = get_min_max('x', min_x, max_x, node)
             min_y, max_y = get_min_max('y', min_y, max_y, node)
             min_z, max_z = get_min_max('z', min_z, max_z, node)
-            
+
+
+        min_nodes = [min_x, min_y, min_z]
+        max_nodes = [max_x, max_y, max_z]
+
         mins = {'x': min_x, 'y': min_y, 'z': min_z}
         maxs = {'x': max_x, 'y': max_y, 'z': max_z}
-        
+
+        delta_nodes = [mins['x'], maxs['x']]
+        delta_max = 0
+        delta_vals = [0,0,0]
+
+        apex_node = [mins['x'], 'x']
+
+        for key_min in mins:
+            for key_max in maxs:
+                delta = abs(mins[key_min][key_min] - maxs[key_max][key_max])
+
+                new_max = True if delta > delta_max else False
+
+                if new_max:
+                    delta_max = delta
+                    apex_node[0] = mins[key_min]
+                    apex_node[1] = key_min
+                    # delta_nodes[1] = maxs[key_max]
+
+        # delta_x = abs(delta_nodes[0]['x'] - delta_nodes[1]['x'])
+        # delta_y = abs(delta_nodes[0]['y'] - delta_nodes[1]['y'])
+        # delta_z = abs(delta_nodes[0]['z'] - delta_nodes[1]['z'])
+        #
+        # delta_max_1 = np.max([delta_x, delta_y, delta_z])
+
+
+        print("Apex " + str(apex_node))
+
+
+
+
+
+
+
+
+
+
         self.apex_nodes = mins
         self.base_nodes = maxs
-        
+
         # for node_id in nodes:
         #     node = nodes[node_id]
         #     count_min_x = count_x + 1 if is_within_range('x', min_x,node,5)
         #     count_min_y = count_x + 1 if is_within_range('y', min_y,node,5)
         #     count_min_z = count_x + 1 if is_within_range('z', min_z,node,5)
-              
-    
-    
+
+
+
     ##################################################
     # Calculation Methods
     ##################################################
@@ -118,7 +159,7 @@ class FEBio_post_process():
         convex_hull = ConvexHull(points)
 
         return convex_hull.volume
-    
+
     ##################################################
     # Post-Process Methods
     ##################################################
@@ -131,6 +172,3 @@ class FEBio_post_process():
         v_1 = v_1 * 0.001
 
         return abs((v_0 - v_1) / v_0)
-    
-
-
