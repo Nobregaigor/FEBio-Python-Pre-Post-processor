@@ -72,7 +72,7 @@ if __name__ == "__main__":
     print("     Ejection Fraction            = ", ejection_fraction)
     print("     Wall Thickness Fraction      = ", wall_th_frac)
     print("     Apex Wall Thickness Fraction = ", apex_wall_th_frac)
-    print("     Radial Shortening            = ", apex_wall_th_frac)
+    print("     Radial Shortening            = ", radial_shortening)
     
     # print(ejection_fraction)
     # print("hello")
