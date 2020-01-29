@@ -4,6 +4,7 @@ import csv
 from xml.dom import minidom
 
 from .file_manager import *
+from .vector_math import *
 
 class FEBio_post_process():
     def __init__(self):
@@ -14,6 +15,10 @@ class FEBio_post_process():
 
         self.apex_node = {}
         self.base_node = {}
+        
+        self.extreme_nodes = None
+        self.base_params = None
+        self.main_axis = None
 
     ##################################################
     # Fundamental Methods
@@ -30,7 +35,6 @@ class FEBio_post_process():
         self.xyz_positions.extend(read_feb_out_txt_file(positions_file_path))
 
     def set_initial_positions(self,doc=None):
-        """ Hello """
         _doc = self.doc if doc == None else doc
 
         nodes = {}
@@ -38,7 +42,7 @@ class FEBio_post_process():
         sub_array = np.zeros(3)
         points = []
         for elem in data:
-            nodes[str(elem[0])] = {"node": elem[0], "x": elem[1], "y":elem[2], "z": elem[3]}
+            nodes[str(elem[0])] = {"node": elem[0], "x": elem[1], "y":elem[2], "z": elem[3], "np_array": np.array([elem[1], elem[2], elem[3]])}
             sub_array[0] = elem[1]
             sub_array[1] = elem[1]
             sub_array[2] = elem[2]
@@ -54,7 +58,7 @@ class FEBio_post_process():
             }
 
         self.xyz_positions.append(output)
-
+    
     ##################################################
     # Aditional Parameters Methods
     ##################################################
@@ -79,7 +83,7 @@ class FEBio_post_process():
         delta_z = node_1['z'] - node_2['z']
         
         return np.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
-    
+        
     def get_apex_and_base_nodes(self,node_set=None,set_as_properties=False):
         if node_set == None:
             nodes = self.xyz_positions[0]["nodes"]
@@ -140,6 +144,14 @@ class FEBio_post_process():
                 apex_node = node_1
                 apex_node_idx = i 
         
+        main_axis = {}
+        if apex_node_idx == 0 or 3:
+            main_axis['x'] = 0
+        elif apex_node_idx == 1 or 4:
+            main_axis['y'] = 1
+        else:
+            main_axis['z'] = 2
+            
         # Get the idx of the opposite node of apex (won't be used to calculate the centroid)
         node_opposite_to_apex = apex_node_idx + 2 if apex_node_idx < 3 else apex_node_idx - 3
 
@@ -157,11 +169,26 @@ class FEBio_post_process():
             sum_z += node['z']
         
         # Create an object to be set as the base_node
+        center_x = sum_x * 0.25
+        center_y = sum_y * 0.25
+        center_z = sum_z * 0.25
+        
         base_node = {
-            'node': "REF",
-            'x': sum_x * 0.25,
-            'y': sum_y * 0.25,
-            'z': sum_z * 0.25,
+            'node': "REF:BASE",
+            'x': center_x,
+            'y': center_y,
+            'z': center_z,
+            "np_array": np.array([center_x, center_y, center_z])
+        }
+        
+        vectors_from_base = []
+        for node in extreme_nodes:
+            vec = np.subtract(node["np_array"], base_node["np_array"])
+            vectors_from_base.append(vec)
+        
+        base_params = {
+            "vectors_from_base": vectors_from_base,
+            "nomarl": np.cross(vectors_from_base[0], vectors_from_base[1]),
         }
         
         # Point to mins and maxs (for later reference, if needed)
@@ -174,19 +201,23 @@ class FEBio_post_process():
             self.apex_node = apex_node
             self.base_node = base_node
             self.extreme_nodes = extreme_nodes
+            self.base_params = base_params
+            self.main_axis = main_axis
         else:
             return {
                 "apex_node": apex_node,
                 "base_node": base_node,
-                "extreme_nodes": extreme_nodes
+                "extreme_nodes": extreme_nodes,
+                "base_params": base_params,
+                "main_axis": main_axis
                 }
     
-    def get_closest_node(self,node_ref_id,node_set=None):
+    def get_closest_node(self,node_ref_id,node_set=None,time=0,axis=None):
         if node_set == None:
-            nodes = self.xyz_positions[0]["nodes"]
+            nodes = self.xyz_positions[time]["nodes"]
         else:
             if type(node_set) == str:
-                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz',time=time)
             elif type(node_set) == dict:
                 nodes = node_set
             else:
@@ -200,12 +231,18 @@ class FEBio_post_process():
             if next_node_id == node_ref_id:
                 next_node_id = next(inter_nodes)
             node = nodes[next_node_id]
-            dist = self.get_xyz_distance(node_ref,node)
+            if axis == None:
+                dist = self.get_xyz_distance(node_ref,node)
+            else:
+                dist = abs(node_ref[axis] - node[axis])
             close_node = node
             for node_id in nodes:
                 if node_id != node_ref_id:
                     node = nodes[node_id]
-                    new_dist = self.get_xyz_distance(node_ref,node)
+                    if axis == None:
+                        new_dist = self.get_xyz_distance(node_ref,node)
+                    else:
+                        new_dist = abs(node_ref[axis] - node[axis])
                     if new_dist < dist:
                         dist = new_dist
                         close_node = node
@@ -213,12 +250,50 @@ class FEBio_post_process():
         else:
             raise(ValueError("get_closest_node: node_ref_id not in nodes"))
     
-    def get_nodes_within_range(self,node_ref_id,dist=None,al_err=0.1,node_set=None):
+    def get_farthest_node(self,node_ref_id,node_set=None,time=0,axis=None):
         if node_set == None:
-            nodes = self.xyz_positions[0]["nodes"]
+            nodes = self.xyz_positions[time]["nodes"]
         else:
             if type(node_set) == str:
-                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz')
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz',time=time)
+            elif type(node_set) == dict:
+                nodes = node_set
+            else:
+                raise(ValueError("get_farthest_node: node_set type not understood"))
+        
+        node_ref_id = str(node_ref_id)
+        if node_ref_id in nodes:
+            node_ref = nodes[node_ref_id]
+            inter_nodes = iter(nodes)
+            next_node_id = next(inter_nodes)
+            if next_node_id == node_ref_id:
+                next_node_id = next(inter_nodes)
+            node = nodes[next_node_id]
+            if axis == None:
+                dist = self.get_xyz_distance(node_ref,node)
+            else:
+                dist = abs(node_ref[axis] - node[axis])
+            far_node = node
+            for node_id in nodes:
+                if node_id != node_ref_id:
+                    node = nodes[node_id]
+                    if axis == None:
+                        new_dist = self.get_xyz_distance(node_ref,node)
+                    else:
+                        new_dist = abs(node_ref[axis] - node[axis])
+                    if new_dist > dist:
+                        dist = new_dist
+                        far_node = node
+            return far_node, dist
+        else:
+            raise(ValueError("get_farthest_node: node_ref_id not in nodes"))
+        
+    def get_nodes_within_range(self,node_ref_id,dist=None,al_err=0.1,node_set=None,time=0):
+        if node_set == None:
+            nodes = self.xyz_positions[time]["nodes"]
+        else:
+            if type(node_set) == str:
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz',time=time)
             elif type(node_set) == dict:
                 nodes = node_set
             else:
@@ -258,6 +333,96 @@ class FEBio_post_process():
             trial_idx += 1
             
         return nodes_within_range       
+    
+    def get_nodes_along_dir(self,dir_vec, node_ref_id=None, al_err=0.001, node_set=None, time=0):
+        if node_set == None:
+            nodes = self.xyz_positions[time]["nodes"]
+        else:
+            if type(node_set) == str:
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz',time=time)
+            elif type(node_set) == dict:
+                nodes = node_set
+            else:
+                raise(ValueError("get_nodes_along_dir: node_set type not understood"))
+        
+        nodes_along_dir = {}
+        
+        max_tries = 25
+        trial_idx = 0
+        
+        if node_ref_id == None:
+            if len(self.base_node) > 0:
+                node_ref = self.base_node
+            else:
+                node_ref = {"np_array": np.array([0,0,0])}
+        else:
+            if node_ref_id == "REF:BASE":
+                if len(self.base_node) > 0:
+                    node_ref = self.base_node
+                else:
+                    raise(ValueError("get_nodes_along_dir: self.base_node not defined."))
+            elif node_ref_id in nodes:
+                node_ref = nodes[node_ref_id]
+            else:
+                raise(ValueError("get_nodes_along_dir: node_ref_id not in nodes."))
+        
+        while len(nodes_along_dir) < 1:
+            if trial_idx > max_tries:
+                print("Warning: Max number of trials reached when trying to find nodes along dir.\n")
+                return nodes_along_dir
+        
+            for node_id in nodes:
+                node = nodes[node_id]
+                node_dir = np.subtract(node["np_array"],node_ref["np_array"])
+                angle = angle_between(dir_vec, node_dir)
+                if -al_err < angle < al_err:
+                    nodes_along_dir[node_id] = node
+            al_err += 0.01
+            trial_idx += 1
+            
+        return nodes_along_dir
+    
+    def get_radius(self,node_set=None,time=0):
+        
+        if len(self.base_node) < 1:
+            print("get_radius: self.base_node is not defined. Please, use get_apex_and_base_nodes method.")
+            raise
+        elif len(self.base_params) < 1:
+            print("get_radius: self.base_params is not defined. Please, use get_apex_and_base_nodes method.")
+            raise
+        else:
+            if node_set == None:
+                nodes = self.xyz_positions[time]["nodes"]
+            else:
+                if type(node_set) == str:
+                    nodes = self.get_nodes_data_from_nodeset(node_set,'xyz',time=time)
+                elif type(node_set) == dict:
+                    nodes = node_set
+                else:
+                    raise(ValueError("get_radius: node_set type not understood"))
+                
+            node_ref = self.base_node
+            
+            nodes_along_radius = []
+            mean_dist = 0
+            n_means = 0
+            for dir_vec in self.base_params["vectors_from_base"]:
+                nodes_along_dir = self.get_nodes_along_dir(dir_vec,node_ref_id=node_ref["node"],node_set=nodes,time=time)
+                dist = 0
+                n_dist = 0
+                for nodes_along_dir_ids in nodes_along_dir:
+                    node_ = nodes_along_dir[nodes_along_dir_ids]
+                    dist += self.get_xyz_distance(node_ref, node_)
+                    n_dist += 1
+                mean_dist += dist / n_dist
+                n_means += 1
+                nodes_along_radius.append(nodes_along_dir)
+            
+            mean_dist = mean_dist / n_means
+            
+            
+            return nodes_along_radius, mean_dist
+        
 
     ##################################################
     # Calculation Methods

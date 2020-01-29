@@ -1,5 +1,8 @@
 from modules import *
 from pprint import pprint as pp
+
+import numpy as np
+
 if __name__ == "__main__":
 
     # ___________________
@@ -27,9 +30,16 @@ if __name__ == "__main__":
     # Get Apex and base node. Base node will be a REF node, since it is not contained in mesh
     myo_post_process.get_apex_and_base_nodes(set_as_properties=True)
     
-    apex = myo_post_process.apex_node
-    nodes_within_range = myo_post_process.get_nodes_within_range(apex['node'],node_set="Epicardio")
-    print(nodes_within_range)
+    # apex = myo_post_process.apex_node
+    # nodes_within_range = myo_post_process.get_nodes_along_dir(np.array([0,0,1]))
+    # print(nodes_within_range[0])
+    
+    radius_nodes, radius = myo_post_process.get_radius(node_set="Endocardio",time=1)
+    print(radius)
+    
+    
+    
+    # inner_r_0 = get_inner_radius()
     
 
     # ___________________

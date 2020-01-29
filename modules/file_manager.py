@@ -47,6 +47,7 @@ def read_feb_out_txt_file(file_path):
                 data_line = line.split(",")
                 if has_structure:
                     val = {"node": data_line[0]}
+                    val["np_array"] = []
                     # print(data_line)
                     n_keys = len(data_line[1:])
                     sub_array = np.zeros(n_keys)
@@ -55,8 +56,12 @@ def read_feb_out_txt_file(file_path):
                         try:
                             val[key] = float(data_line[i+1])
                             sub_array[i] = float(data_line[i+1])
+                            val["np_array"].append(float(data_line[i+1]))
                         except:
                             val[key] = data_line[i+1]
+                            val["np_array"].append(float(data_line[i+1]))
+                            
+                    val["np_array"] = np.array(val["np_array"])
                     output[idx]["points"].append(sub_array)
                     output[idx]["nodes"][str(data_line[0])] = val
                     # print(val)
