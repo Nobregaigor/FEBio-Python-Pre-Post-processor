@@ -10,6 +10,7 @@ class FEBio_post_process():
     def __init__(self):
         self.doc = None
         self.node_sets = {}
+        self.node_sets_data = {}
 
         self.xyz_positions = []
 
@@ -19,6 +20,9 @@ class FEBio_post_process():
         self.extreme_nodes = None
         self.base_params = None
         self.main_axis = None
+        
+        self.len_sim = 0
+        
 
     ##################################################
     # Fundamental Methods
@@ -33,6 +37,7 @@ class FEBio_post_process():
 
     def set_sim_positions(self,positions_file_path):
         self.xyz_positions.extend(read_feb_out_txt_file(positions_file_path))
+        self.len_sim = len(self.xyz_positions)
 
     def set_initial_positions(self,doc=None):
         _doc = self.doc if doc == None else doc
@@ -59,6 +64,16 @@ class FEBio_post_process():
 
         self.xyz_positions.append(output)
     
+    def set_node_set_data(self,node_set_name,dataType,time=0):
+        if len(self.node_sets_data) < 1:
+            self.node_sets_data[dataType] = {}
+                
+        if len(self.node_sets_data[dataType]) < 1 or node_set_name not in self.node_sets_data[dataType]:
+            self.node_sets_data[dataType][node_set_name] = {}
+            
+            
+        self.node_sets_data[dataType][node_set_name][str(time)] = self.get_nodes_data_from_nodeset(node_set_name,dataType,time)
+        
     ##################################################
     # Aditional Parameters Methods
     ##################################################
@@ -382,8 +397,28 @@ class FEBio_post_process():
             
         return nodes_along_dir
     
-    def get_radius(self,node_set=None,time=0):
-        
+    ##################################################
+    # Calculation Methods
+    ##################################################
+
+    def cal_vol(self,position,node_set=None):
+        if node_set != None:
+            data = self.xyz_positions[position]
+            n_nodes = len(self.node_sets[node_set])
+            points = np.zeros(n_nodes,dtype=np.dtype((np.dtype('f8'), (3))))
+            i = 0
+            for id in self.node_sets[node_set]:
+                node = data["nodes"][str(id)]
+                points[i] = np.array([node["x"], node["y"], node["z"]])
+                i += 1
+        else:
+            points = self.xyz_positions[position]["points"]
+
+        convex_hull = ConvexHull(points)
+
+        return convex_hull.volume
+
+    def cal_radius(self,node_set=None,time=0):
         if len(self.base_node) < 1:
             print("get_radius: self.base_node is not defined. Please, use get_apex_and_base_nodes method.")
             raise
@@ -421,39 +456,91 @@ class FEBio_post_process():
             mean_dist = mean_dist / n_means
             
             
-            return nodes_along_radius, mean_dist
-        
-
-    ##################################################
-    # Calculation Methods
-    ##################################################
-
-    def cal_vol(self,position,node_set=None):
-        if node_set != None:
-            data = self.xyz_positions[position]
-            n_nodes = len(self.node_sets[node_set])
-            points = np.zeros(n_nodes,dtype=np.dtype((np.dtype('f8'), (3))))
-            i = 0
-            for id in self.node_sets[node_set]:
-                node = data["nodes"][str(id)]
-                points[i] = np.array([node["x"], node["y"], node["z"]])
-                i += 1
-        else:
-            points = self.xyz_positions[position]["points"]
-
-        convex_hull = ConvexHull(points)
-
-        return convex_hull.volume
-
+            return mean_dist, nodes_along_radius
+    
     ##################################################
     # Post-Process Methods
     ##################################################
 
     def ejection_fraction(self,endocardio_node_set_name="Endocardio"):
+        # Calculting volume (inital and final)
         v_0 = self.cal_vol(0,endocardio_node_set_name)
-        v_1 = self.cal_vol(len(self.xyz_positions)-1,endocardio_node_set_name)
-
+        v_1 = self.cal_vol(self.len_sim-1,endocardio_node_set_name)
+        
+        # Converting to ml
         v_0 = v_0 * 0.001
         v_1 = v_1 * 0.001
+        
+        print("         -> initial volume (ml) = ", v_0)
+        print("         -> final volume (ml) = ", v_1)
 
         return abs((v_0 - v_1) / v_0)
+
+    def thickness_fraction(self,endo_node_set_name="Endocardio",epi_node_set_name="Epicardio"):
+        
+        # Poiting to node_sets_data 
+        # Initial state
+        i_endo_node_set_data = self.node_sets_data["position"][endo_node_set_name]['0']
+        i_epi_node_set_data = self.node_sets_data["position"][epi_node_set_name]['0']
+        # Final state
+        f_endo_node_set_data = self.node_sets_data["position"][endo_node_set_name][str(self.len_sim-1)]
+        f_epi_node_set_data = self.node_sets_data["position"][epi_node_set_name][str(self.len_sim-1)]
+        
+        # Calculating radius
+        # Initial state
+        i_endo_radius = self.cal_radius(node_set=i_endo_node_set_data)[0]
+        i_epi_radius = self.cal_radius(node_set=i_epi_node_set_data)[0]
+        print("         -> initial endo radius = ", i_endo_radius)
+        print("         -> initial epi radius = ", i_epi_radius)
+        # Final state
+        f_endo_radius = self.cal_radius(node_set=f_endo_node_set_data)[0]
+        f_epi_radius = self.cal_radius(node_set=f_epi_node_set_data)[0]
+        print("         -> final endo radius = ", f_endo_radius)
+        print("         -> final epi radius = ", f_epi_radius)
+        
+        # Calculating wall thickness
+        i_wall_th = i_epi_radius - i_endo_radius
+        f_wall_th = f_epi_radius - f_endo_radius
+        print("         -> initial wall thi = ", i_wall_th)
+        print("         -> final wall thi = ", f_wall_th)
+        
+        # Calculating Thickness fraction
+        th_frac = (f_wall_th - i_wall_th) / i_wall_th
+        
+        return th_frac, [i_wall_th, f_wall_th]
+    
+    def apex_thickness_fraction(self,endo_node_set_name="Endocardio"):
+        
+        apex_node_id = self.apex_node["node"]
+        i_epi_apex = nodes = self.xyz_positions[0]["nodes"][str(apex_node_id)]
+        f_epi_apex = nodes = self.xyz_positions[self.len_sim-1]["nodes"][str(apex_node_id)]
+        
+        i_endo_apex = self.get_apex_and_base_nodes(self.node_sets_data["position"][endo_node_set_name]['0'], set_as_properties=False)
+        f_endo_apex = self.get_apex_and_base_nodes(self.node_sets_data["position"][endo_node_set_name][str(self.len_sim-1)], set_as_properties=False)
+        i_endo_apex = i_endo_apex["apex_node"]
+        f_endo_apex = f_endo_apex["apex_node"]
+        
+        i_apex_wall_th = self.get_xyz_distance(i_endo_apex,i_epi_apex)
+        f_apex_wall_th = self.get_xyz_distance(f_endo_apex,f_epi_apex)
+        
+        print("             -> initial apex wall thickness = ", i_apex_wall_th)
+        print("             -> final apex wall thickness = ", f_apex_wall_th)
+        
+        return (f_apex_wall_th - i_apex_wall_th) / i_apex_wall_th
+    
+    def radial_shortening(self, endo_node_set_name="Endocardio"):
+        
+        i_endo_node_set_data = self.node_sets_data["position"][endo_node_set_name]['0']
+        f_endo_node_set_data = self.node_sets_data["position"][endo_node_set_name][str(self.len_sim-1)]
+        
+        i_endo_radius = self.cal_radius(node_set=i_endo_node_set_data)[0]
+        f_endo_radius = self.cal_radius(node_set=f_endo_node_set_data)[0]
+        
+        print("         -> initial endo radius = ", i_endo_radius)
+        print("         -> final endo radius = ", f_endo_radius)
+        
+        return (f_endo_radius - i_endo_radius) / i_endo_radius
+        
+        
+        
+        
