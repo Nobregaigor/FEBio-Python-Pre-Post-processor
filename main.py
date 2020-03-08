@@ -1,15 +1,59 @@
 from modules import *
 from pprint import pprint as pp
-
 import numpy as np
 
-if __name__ == "__main__":
+import sys, getopt
+from pathlib import Path
+from os import listdir
+from os.path import isfile, join
 
+def get_input_arguments(argv):
+    i_folder = None
+    o_folder = None
+    try:
+        opts, args = getopt.getopt(argv,"hi:o:",["ifolder=","ofolder="])
+    except getopt.GetoptError:
+        print('Error in command input. Format should be: -i <inputfolder> -o <outputfolder>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('-i <inputfolder> -o <outputfolder>')
+            sys.exit()
+        elif opt in ("-i", "--ifolder"):
+            i_folder = arg
+        elif opt in ("-o", "--ofolder"):
+            o_folder = arg
+
+    if o_folder == None:
+        o_folder = i_folder # default value
+
+    if i_folder == None:
+        print("Error: no input folder.")
+        sys.exit(-1)
+
+    return i_folder, o_folder
+
+
+if __name__ == "__main__":
+    i_folder, o_folder = get_input_arguments(sys.argv[1:])
+    
+    files = [f for f in listdir(i_folder) if isfile(join(i_folder, f))]
+    
+    for file in files:
+        if file.rfind(".feb") != -1:
+            myo_feb_file_path = join(i_folder,file)
+        elif file.find("position_node_out") != -1:
+            position_nodes_out_file_path = join(i_folder,file)
+
+    if myo_feb_file_path == None or position_nodes_out_file_path == None:
+        print("Error: check files in input folder. Did not find .feb or 'position_node_out'")
+        sys.exit(-1)
+    
     # ___________________
     # File Paths
     # ___________________
-    myo_feb_file_path = "input/LinearConstrainTest3_1.feb"
-    position_nodes_out_file_path = "input/simulation_outputs/position_node_out.txt"
+    # myo_feb_file_path = "input/Myo_ideal_tet_unv_2_with_fibers.feb"
+    # position_nodes_out_file_path = "input/active_sim_outputs/position_node_out.txt"
 
     # ___________________
     # Creating Object for Post Process
@@ -43,6 +87,11 @@ if __name__ == "__main__":
     # Get Apex and base node. Base node will be a REF node, since it is not contained in mesh
     print("     Getting apex and base from nodes position data...")
     myo_post_process.get_apex_and_base_nodes(set_as_properties=True)
+
+    print(myo_post_process.apex_node)
+
+    
+    myo_post_process.plot_surface(myo_post_process.node_sets_data["position"]["Epicardio"]['0'])
     
     # ___________________
     # Calculations
@@ -73,7 +122,14 @@ if __name__ == "__main__":
     print("     Wall Thickness Fraction      = ", wall_th_frac)
     print("     Apex Wall Thickness Fraction = ", apex_wall_th_frac)
     print("     Radial Shortening            = ", radial_shortening)
+
+    with open(join(o_folder, "results.txt"), "w") as file:
+        file.write("Ejection Fraction            = " + str(ejection_fraction) + "\n")
+        file.write("Wall Thickness Fraction      = " + str(wall_th_frac) + "\n")
+        file.write("Apex Wall Thickness Fraction = " + str(apex_wall_th_frac) + "\n")
+        file.write("Radial Shortening            = " + str(radial_shortening) + "\n")
+        
     
-    # print(ejection_fraction)
-    # print("hello")
+    # # print(ejection_fraction)
+    # # print("hello")
     

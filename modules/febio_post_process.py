@@ -6,6 +6,10 @@ from xml.dom import minidom
 from .file_manager import *
 from .vector_math import *
 
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D 
+import matplotlib.pyplot as plt
+
 class FEBio_post_process():
     def __init__(self):
         self.doc = None
@@ -540,6 +544,45 @@ class FEBio_post_process():
         print("         -> final endo radius = ", f_endo_radius)
         
         return (f_endo_radius - i_endo_radius) / i_endo_radius
+
+
+    def plot_surface(self,node_set=None,time=0):
+        if node_set == None:
+            nodes = self.xyz_positions[time]["nodes"]
+        else:
+            if type(node_set) == str:
+                nodes = self.get_nodes_data_from_nodeset(node_set,'xyz',time=time)
+            elif type(node_set) == dict:
+                nodes = node_set
+            else:
+                raise(ValueError("get_nodes_along_dir: node_set type not understood"))
+
+        # print("nodes",nodes)
+
+        x = np.zeros(len(nodes))
+        y = np.zeros(len(nodes))
+        z = np.zeros(len(nodes))
+        
+        idx = 0
+        for key in nodes:
+            elem = nodes[key]
+            # print(elem)
+            x[idx] = elem["x"]
+            y[idx] = elem["y"]
+            z[idx] = elem["z"]
+
+            idx += 1
+            
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.scatter(x, y, z)
+
+        ax.set_xlabel(' X ')
+        ax.set_ylabel(' Y ')
+        ax.set_zlabel(' Z ')
+
+        plt.show()
         
         
         
