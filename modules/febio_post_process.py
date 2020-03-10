@@ -81,7 +81,7 @@ class FEBio_post_process():
     ##################################################
     # Aditional Parameters Methods
     ##################################################
-    
+
     def get_nodes_data_from_nodeset(self,node_set_name,dataType,time=0):
         if node_set_name in self.node_sets:
             dataType = dataType.lower()

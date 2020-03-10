@@ -60,38 +60,58 @@ if __name__ == "__main__":
     # ___________________
     print("#"*60)
     print("Initializing Post Process:")
-    # Storing the Post process at location defined by myo_post_process
-    myo_post_process = FEBio_post_process()
+    # Storing the Post process at location defined by m_p_p
+    m_p_p = FEBio_post_process()
     # Creating a doc for the desired post process file
-    myo_post_process.create_doc(myo_feb_file_path)
+    m_p_p.create_doc(myo_feb_file_path)
     
     # Adding NodeSets to the object
     print("     Adding node sets...")
-    myo_post_process.add_node_set("Epicardio")
-    myo_post_process.add_node_set("Endocardio")
-    myo_post_process.add_node_set("Top_surface")
+    m_p_p.add_node_set("Epicardio")
+    m_p_p.add_node_set("Endocardio")
+    m_p_p.add_node_set("Top_surface")
     
     # Set inital positions obtained by .feb model
     print("     Setting positions...")
-    myo_post_process.set_initial_positions()
+    m_p_p.set_initial_positions()
     # Set positions obtained by the simulations
-    myo_post_process.set_sim_positions(position_nodes_out_file_path)
+    m_p_p.set_sim_positions(position_nodes_out_file_path)
     
     # Set position data attributed to each data_set (makes run faster since many functions require the data from a node_set)
     print("     Setting node set data (position)...")
-    myo_post_process.set_node_set_data("Epicardio","position",0)
-    myo_post_process.set_node_set_data("Endocardio","position",0)
-    myo_post_process.set_node_set_data("Epicardio","position",myo_post_process.len_sim-1)
-    myo_post_process.set_node_set_data("Endocardio","position",myo_post_process.len_sim-1)
+    m_p_p.set_node_set_data("Epicardio","position",0)
+    m_p_p.set_node_set_data("Endocardio","position",0)
+    m_p_p.set_node_set_data("Epicardio","position",m_p_p.len_sim-1)
+    m_p_p.set_node_set_data("Endocardio","position",m_p_p.len_sim-1)
     
     # Get Apex and base node. Base node will be a REF node, since it is not contained in mesh
     print("     Getting apex and base from nodes position data...")
-    myo_post_process.get_apex_and_base_nodes(set_as_properties=True)
+    m_p_p.get_apex_and_base_nodes(set_as_properties=True)
 
-    print(myo_post_process.apex_node)
+    # print(m_p_p.apex_node)
+
+    print("#"*60)
+    print("Data information:")
+    for node_set in m_p_p.node_sets:
+        print("     Number of nodes in '" + node_set + "':", len(m_p_p.node_sets[node_set]))
+
+    # first_data = m_p_p.node_sets_data[next(iter(m_p_p.node_sets_data))][next(iter(m_p_p.node_sets))]["0"]
+    # last_data = m_p_p.node_sets_data[next(iter(m_p_p.node_sets_data))][next(iter(m_p_p.node_sets))][str(m_p_p.len_sim-1)]
+    # # print("     Number of steps in simulation:",last_data)
+    # print("     Number of steps extracted:", m_p_p.len_sim)    
+    # for key in m_p_p.node_sets_data:
+    #     print("     Data_set_extracted:",key)
+
+    # print("     Initial time in simulation:",first_data["time"])
+    # print("     Final time in simulation:",last_data["time"])
+    
+    
+    
+
+
 
     
-    myo_post_process.plot_surface(myo_post_process.node_sets_data["position"]["Epicardio"]['0'])
+    m_p_p.plot_surface(m_p_p.node_sets_data["position"]["Epicardio"]['0'])
     
     # ___________________
     # Calculations
@@ -101,16 +121,16 @@ if __name__ == "__main__":
     
     # Calculating Ejection Fraction
     print("     Calculating Ejection Fraction...")
-    ejection_fraction = myo_post_process.ejection_fraction()
+    ejection_fraction = m_p_p.ejection_fraction()
     
     print("     Calculating Wall Thickness Fraction...")
-    wall_th_frac = myo_post_process.thickness_fraction()[0]
+    wall_th_frac = m_p_p.thickness_fraction()[0]
     
     print(" Calculating Apex Wall Thickness Fraction...")
-    apex_wall_th_frac = myo_post_process.apex_thickness_fraction()
+    apex_wall_th_frac = m_p_p.apex_thickness_fraction()
     
     print(" Calculating Radial Shortening...")
-    radial_shortening = myo_post_process.radial_shortening()
+    radial_shortening = m_p_p.radial_shortening()
     
     # ___________________
     # Printing / saving results
