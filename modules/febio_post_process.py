@@ -475,10 +475,12 @@ class FEBio_post_process():
         v_0 = v_0 * 0.001
         v_1 = v_1 * 0.001
         
-        print("         -> initial volume (ml) = ", v_0)
-        print("         -> final volume (ml) = ", v_1)
+        print("         -> initial volume (ml) = ", v_0) # end-diastole
+        print("         -> final volume (ml) = ", v_1)   # end-systole
 
-        return abs((v_0 - v_1) / v_0)
+        ejf = (v_0 - v_1) / v_0
+
+        return ejf, [v_0, v_1]
 
     def thickness_fraction(self,endo_node_set_name="Endocardio",epi_node_set_name="Epicardio"):
         
@@ -505,11 +507,11 @@ class FEBio_post_process():
         # Calculating wall thickness
         i_wall_th = i_epi_radius - i_endo_radius
         f_wall_th = f_epi_radius - f_endo_radius
-        print("         -> initial wall thi = ", i_wall_th)
-        print("         -> final wall thi = ", f_wall_th)
+        print("         -> initial wall thi = ", i_wall_th) # end-diastole
+        print("         -> final wall thi = ", f_wall_th)   #end-systole
         
         # Calculating Thickness fraction
-        th_frac = (f_wall_th - i_wall_th) / i_wall_th
+        th_frac = (i_wall_th - f_wall_th) / i_wall_th
         
         return th_frac, [i_wall_th, f_wall_th]
     
@@ -530,7 +532,7 @@ class FEBio_post_process():
         print("             -> initial apex wall thickness = ", i_apex_wall_th)
         print("             -> final apex wall thickness = ", f_apex_wall_th)
         
-        return (f_apex_wall_th - i_apex_wall_th) / i_apex_wall_th
+        return (i_apex_wall_th - f_apex_wall_th) / i_apex_wall_th, [i_apex_wall_th, f_apex_wall_th]
     
     def radial_shortening(self, endo_node_set_name="Endocardio"):
         
@@ -540,10 +542,10 @@ class FEBio_post_process():
         i_endo_radius = self.cal_radius(node_set=i_endo_node_set_data)[0]
         f_endo_radius = self.cal_radius(node_set=f_endo_node_set_data)[0]
         
-        print("         -> initial endo radius = ", i_endo_radius)
-        print("         -> final endo radius = ", f_endo_radius)
+        print("         -> initial endo radius = ", i_endo_radius) # end-diastole
+        print("         -> final endo radius = ", f_endo_radius)   # end-systole
         
-        return (f_endo_radius - i_endo_radius) / i_endo_radius
+        return (f_endo_radius - i_endo_radius) / i_endo_radius , [i_endo_radius, f_endo_radius]
 
 
     def plot_surface(self,node_set=None,time=0):
@@ -584,6 +586,42 @@ class FEBio_post_process():
 
         plt.show()
         
+        
+    def plot_shape(self,time=0):
+        
+        nodes_to_plot = []
+        legends = []
+        for nodes_set in self.node_sets_data["position"]:
+            legends.append(nodes_set)
+            nodes_to_plot.append(self.node_sets_data["position"][nodes_set][str(time)])
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        for nodes in nodes_to_plot:
+
+            x = np.zeros(len(nodes))
+            y = np.zeros(len(nodes))
+            z = np.zeros(len(nodes))
+            
+            idx = 0
+            for key in nodes:
+                elem = nodes[key]
+                # print(elem)
+                x[idx] = elem["x"]
+                y[idx] = elem["y"]
+                z[idx] = elem["z"]
+
+                idx += 1
+
+            ax.scatter(x, y, z)
+
+        ax.set_xlabel(' X ')
+        ax.set_ylabel(' Y ')
+        ax.set_zlabel(' Z ')
+        ax.legend(legends)
+
+        plt.show()
         
         
         

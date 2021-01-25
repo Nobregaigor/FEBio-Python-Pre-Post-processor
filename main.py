@@ -104,14 +104,10 @@ if __name__ == "__main__":
 
     # print("     Initial time in simulation:",first_data["time"])
     # print("     Final time in simulation:",last_data["time"])
-    
-    
-    
 
-
-
-    
-    m_p_p.plot_surface(m_p_p.node_sets_data["position"]["Epicardio"]['0'])
+    # m_p_p.plot_surface(m_p_p.node_sets_data["position"]["Epicardio"]['0'])
+    # m_p_p.plot_surface(m_p_p.node_sets_data["position"]["Endocardio"]['0'],ax=ax)
+    # m_p_p.plot_shape()
     
     # ___________________
     # Calculations
@@ -121,16 +117,16 @@ if __name__ == "__main__":
     
     # Calculating Ejection Fraction
     print("     Calculating Ejection Fraction...")
-    ejection_fraction = m_p_p.ejection_fraction()
+    ejection_fraction, volumes = m_p_p.ejection_fraction()
     
     print("     Calculating Wall Thickness Fraction...")
-    wall_th_frac = m_p_p.thickness_fraction()[0]
+    wall_th_frac, wall_thickness = m_p_p.thickness_fraction()
     
     print(" Calculating Apex Wall Thickness Fraction...")
-    apex_wall_th_frac = m_p_p.apex_thickness_fraction()
+    apex_wall_th_frac, apex_wall_thickness = m_p_p.apex_thickness_fraction()
     
     print(" Calculating Radial Shortening...")
-    radial_shortening = m_p_p.radial_shortening()
+    radial_shortening, endo_radius = m_p_p.radial_shortening()
     
     # ___________________
     # Printing / saving results
@@ -144,6 +140,19 @@ if __name__ == "__main__":
     print("     Radial Shortening            = ", radial_shortening)
 
     with open(join(o_folder, "results.txt"), "w") as file:
+
+        file.write("Initial Endocardio volume    = " + str(volumes[0]) + "\n")
+        file.write("Final Endocardio volume      = " + str(volumes[1]) + "\n")
+
+        file.write("Initial wall thickness       = " + str(wall_thickness[0]) + "\n")
+        file.write("Final wall thickness         = " + str(wall_thickness[1]) + "\n")
+
+        file.write("Initial apex wall thickness  = " + str(apex_wall_thickness[0]) + "\n")
+        file.write("Final apex wall thickness    = " + str(apex_wall_thickness[1]) + "\n")
+
+        file.write("Initial Endocardio radius    = " + str(endo_radius[0]) + "\n")
+        file.write("Final Endocardio radius      = " + str(endo_radius[1]) + "\n")
+        
         file.write("Ejection Fraction            = " + str(ejection_fraction) + "\n")
         file.write("Wall Thickness Fraction      = " + str(wall_th_frac) + "\n")
         file.write("Apex Wall Thickness Fraction = " + str(apex_wall_th_frac) + "\n")
